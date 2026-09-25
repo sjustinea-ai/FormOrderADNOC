@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -17,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -34,10 +36,11 @@ jobs:
           cp -r *.html www/ 2>/dev/null || true
           cp -r *.js www/ 2>/dev/null || true
           cp -r *.css www/ 2>/dev/null || true
-          if [ -f "index.html" ]; then
-            echo "index.html ditemukan."
-          else
-            cp www/*.html www/index.html 2>/dev/null || true
+          if [ ! -f "www/index.html" ]; then
+            first_html=$(ls www/*.html 2>/dev/null | head -n 1)
+            if [ -n "$first_html" ]; then
+              cp "$first_html" www/index.html
+            fi
           fi
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
@@ -49,7 +52,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
