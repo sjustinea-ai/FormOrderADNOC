@@ -14,51 +14,45 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '17'
 
-      - name: Extract Android project
-        run: |
-          mkdir -p android_project
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ZIP Android project tidak ditemukan"
-            exit 1
+      - name: Prepare Web Assets & Install Capacitor
+        run: |
+          mkdir -p www
+          cp -r *.html www/ 2>/dev/null || true
+          cp -r *.js www/ 2>/dev/null || true
+          cp -r *.css www/ 2>/dev/null || true
+          if [ -f "index.html" ]; then
+            echo "index.html ditemukan."
+          else
+            cp www/*.html www/index.html 2>/dev/null || true
           fi
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "ADNOC Order" "com.adnoc.order" --web-dir www
+          npx cap add android
+          npx cap sync android
 
-          unzip -q "$ZIP_FILE" -d android_project
-
-      - name: Find Android project
+      - name: Build Android APK
         run: |
-          PROJECT_DIR=$(find android_project -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) -exec dirname {} \; | head -n 1)
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "Project Android tidak ditemukan"
-            echo "Isi ZIP:"
-            find android_project -maxdepth 4 -type f | head -100
-            exit 1
-          fi
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
-          echo "Project ditemukan di: $PROJECT_DIR"
-
-            - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Build APK
-        run: |
-          cd "$PROJECT_DIR"
-          gradle assembleDebug
-
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FormOrderADNOC-APK
-          path: |
-            **/build/outputs/apk/debug/*.apk
+          name: ADNOC-Order-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
